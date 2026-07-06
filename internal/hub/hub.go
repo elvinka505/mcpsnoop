@@ -147,22 +147,7 @@ func (h *Hub) replayFile(path string) {
 		return
 	}
 	defer f.Close()
-	_ = decodeEnvelopes(f, h.emit)
-}
-
-func decodeEnvelopes(r io.Reader, emit func(proxy.Envelope)) error {
-	dec := json.NewDecoder(r)
-
-	for {
-		var env proxy.Envelope
-		if err := dec.Decode(&env); err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		emit(env)
-	}
+	_ = proxy.Decode(f, h.emit)
 }
 
 // emit deduplicates by per-session high-water-mark on Seq, then forwards.
