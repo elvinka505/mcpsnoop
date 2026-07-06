@@ -147,13 +147,21 @@ func (h *Hub) replayFile(path string) {
 		return
 	}
 	defer f.Close()
-	dec := json.NewDecoder(f)
+	_ = decodeEnvelopes(f, h.emit)
+}
+
+func decodeEnvelopes(r io.Reader, emit func(proxy.Envelope)) error {
+	dec := json.NewDecoder(r)
+
 	for {
 		var env proxy.Envelope
 		if err := dec.Decode(&env); err != nil {
-			return
+			if err == io.EOF {
+				return nil
+			}
+			return err
 		}
-		h.emit(env)
+		emit(env)
 	}
 }
 
