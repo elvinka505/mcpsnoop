@@ -149,6 +149,22 @@ func main() {
 		fs.PrintDefaults()
 	}
 	_ = fs.Parse(os.Args[1:])
+	cfg, ok, err := loadConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mcpsnoop:", err)
+		os.Exit(1)
+	}
+
+	applyConfig(
+		fs,
+		cfg,
+		ok,
+		label,
+		traceFile,
+		noTrace,
+		redactSecrets,
+		&redactKeys,
+	)
 
 	if *showVer {
 		fmt.Println("mcpsnoop", appVersion())
