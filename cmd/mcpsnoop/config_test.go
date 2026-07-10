@@ -270,3 +270,43 @@ func TestApplyConfigExplicitRedactKeyOverridesConfig(t *testing.T) {
 		t.Fatalf("expected explicit redact-key to win, got %v", redactKeys)
 	}
 }
+
+func TestParseConfigRejectsArraySyntax(t *testing.T) {
+	_, err := parseConfig(strings.NewReader(`
+redact-key = ["token", "authorization"]
+`))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseConfigRejectsTrailingContentAfterQuote(t *testing.T) {
+	_, err := parseConfig(strings.NewReader(`
+label = "fs" # my server
+`))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseConfigRejectsUnterminatedQuotedValue(t *testing.T) {
+	_, err := parseConfig(strings.NewReader(`
+label = "fs
+`))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseConfigRejectsTrailingCommentOnUnquotedValue(t *testing.T) {
+	_, err := parseConfig(strings.NewReader(`
+redact-key = token,api_key # note
+`))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

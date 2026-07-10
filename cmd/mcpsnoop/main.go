@@ -149,22 +149,6 @@ func main() {
 		fs.PrintDefaults()
 	}
 	_ = fs.Parse(os.Args[1:])
-	cfg, ok, err := loadConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "mcpsnoop:", err)
-		os.Exit(1)
-	}
-
-	applyConfig(
-		fs,
-		cfg,
-		ok,
-		label,
-		traceFile,
-		noTrace,
-		redactSecrets,
-		&redactKeys,
-	)
 
 	if *showVer {
 		fmt.Println("mcpsnoop", appVersion())
@@ -172,7 +156,30 @@ func main() {
 	}
 
 	if command := fs.Args(); len(command) > 0 {
-		os.Exit(runShim(command, *label, *traceFile, *noTrace, redactConfig(*redactSecrets, redactKeys, redactValues)))
+		cfg, ok, err := loadConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "mcpsnoop:", err)
+			os.Exit(1)
+		}
+
+		applyConfig(
+			fs,
+			cfg,
+			ok,
+			label,
+			traceFile,
+			noTrace,
+			redactSecrets,
+			&redactKeys,
+		)
+
+		os.Exit(runShim(
+			command,
+			*label,
+			*traceFile,
+			*noTrace,
+			redactConfig(*redactSecrets, redactKeys, redactValues),
+		))
 	}
 	os.Exit(runHub())
 }
@@ -351,6 +358,22 @@ func runHTTP(args []string) int {
 	fs.Var(&redactKeys, "redact-key", "JSON key name to scrub in saved trace payloads (repeat or comma-separated)")
 	fs.Var(&redactValues, "redact-value", "regular expression to scrub inside observed string values, stderr, and non-JSON text (repeatable)")
 	_ = fs.Parse(args)
+	cfg, ok, err := loadConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mcpsnoop http:", err)
+		return 1
+	}
+
+	applyConfig(
+		fs,
+		cfg,
+		ok,
+		label,
+		nil,
+		noTrace,
+		redactSecrets,
+		&redactKeys,
+	)
 	if *target == "" {
 		fmt.Fprintln(os.Stderr, "mcpsnoop http: --target is required")
 		return 2

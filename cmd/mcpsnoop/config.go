@@ -38,6 +38,37 @@ func loadConfig() (config, bool, error) {
 	return cfg, true, nil
 }
 
+func parseValue(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+
+	if strings.HasPrefix(value, "[") {
+		return "", fmt.Errorf("array values are not supported")
+	}
+
+	if strings.HasPrefix(value, `"`) {
+		rest := value[1:]
+		quote := strings.Index(rest, `"`)
+
+		if quote == -1 {
+			return "", fmt.Errorf("unterminated quoted value")
+		}
+
+		end := quote + 1
+
+		if strings.TrimSpace(value[end+1:]) != "" {
+			return "", fmt.Errorf("unexpected content after quoted value")
+		}
+
+		return value[1:end], nil
+	}
+
+	if i := strings.Index(value, "#"); i >= 0 {
+		return "", fmt.Errorf("unexpected content after value")
+	}
+
+	return value, nil
+}
+
 func parseConfig(r io.Reader) (config, error) {
 	var cfg config
 
@@ -56,7 +87,11 @@ func parseConfig(r io.Reader) (config, error) {
 		}
 
 		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+
+		value, err := parseValue(parts[1])
+		if err != nil {
+			return config{}, fmt.Errorf("invalid value for %q: %w", key, err)
+		}
 
 		switch key {
 		case "label":
@@ -120,7 +155,7 @@ func applyConfig(
 		*label = cfg.Label
 	}
 
-	if !visited["trace-file"] {
+	if traceFile != nil && !visited["trace-file"] {
 		*traceFile = cfg.TraceFile
 	}
 

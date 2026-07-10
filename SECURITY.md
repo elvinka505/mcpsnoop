@@ -11,6 +11,10 @@ mcpsnoop runs the server command you wrap and captures MCP payloads that may
 include credentials, so treat saved traces as sensitive and see the redaction
 options in the README before you share one.
 
+mcpsnoop also reads `.mcpsnoop.toml` from the current working directory. Only
+use it in directories you trust, since a config file can change tracing
+behavior (for example, `no-trace`) or override the trace output path.
+
 ## Supported versions
 
 Security fixes land only on the latest release, so please update to the newest
