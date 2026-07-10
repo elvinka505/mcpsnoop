@@ -57,6 +57,27 @@ mcpsnoop
 No flags, no socket paths, no startup order to remember. The shim and the UI find
 each other on their own, and the UI backfills past sessions from disk.
 
+### Config file
+
+If you reuse the same shim flags across a project, put them in a
+`.mcpsnoop.toml` file in the current working directory.
+
+```toml
+label = "filesystem"
+trace-file = "trace.jsonl"
+redact-secrets = true
+redact-key = "token,authorization"
+no-trace = false
+```
+
+The config file supports `label`, `trace-file`, `redact-secrets`,
+`redact-key`, and `no-trace`.
+
+The file is only looked up in the current working directory. Parent
+directories are not searched.
+
+Explicit command-line flags override values from the config file.
+
 For a streamable-HTTP server, run mcpsnoop as a reverse proxy.
 
 ```bash
