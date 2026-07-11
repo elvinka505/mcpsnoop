@@ -57,6 +57,16 @@ mcpsnoop
 No flags, no socket paths, no startup order to remember. The shim and the UI find
 each other on their own, and the UI backfills past sessions from disk.
 
+For a streamable-HTTP server, run mcpsnoop as a reverse proxy.
+
+```bash
+mcpsnoop http --target http://localhost:3000/mcp --listen :7000
+```
+
+No server of your own? [Try it for real](docs/TRY_IT.md) against a published
+test server, driven by your own client. To inspect a session after it happened,
+see [review past sessions from logs](docs/POST_MORTEM.md).
+
 ### Config file
 
 If you reuse the same shim flags across a project, put them in a
@@ -78,15 +88,19 @@ directories are not searched.
 
 Explicit command-line flags override values from the config file.
 
-For a streamable-HTTP server, run mcpsnoop as a reverse proxy.
+## Commands
 
-```bash
-mcpsnoop http --target http://localhost:3000/mcp --listen :7000
-```
+| Command | What it does |
+|---|---|
+| `mcpsnoop -- <server>` | wrap a stdio server as a transparent shim |
+| `mcpsnoop` | open the live TUI |
+| `mcpsnoop http --target <url>` | proxy a streamable-HTTP server |
+| `mcpsnoop export` | render a session to json, html, text, or otlp |
+| `mcpsnoop open` | open a saved session in the TUI |
+| `mcpsnoop remote <user@host>` | print the SSH tunnel command |
+| `mcpsnoop demo` | play a scripted session |
 
-No server of your own? [Try it for real](docs/TRY_IT.md) against a published
-test server, driven by your own client. To inspect a session after it happened,
-see [review past sessions from logs](docs/POST_MORTEM.md).
+Run `mcpsnoop help` for the full list, or `mcpsnoop help <command>` for the flags of one.
 
 ## How it compares
 
@@ -118,6 +132,16 @@ brew install kerlenton/mcpsnoop/mcpsnoop
 ```
 
 Prebuilt binaries for every platform are on the [Releases](https://github.com/kerlenton/mcpsnoop/releases) page.
+
+### Shell completions
+
+mcpsnoop ships completions for bash, zsh, fish, and PowerShell.
+
+```bash
+mcpsnoop completion zsh > "${fpath[1]}/_mcpsnoop"   # then restart your shell
+```
+
+Run `mcpsnoop completion --help` for the other shells and setup details.
 
 ## How it works
 
