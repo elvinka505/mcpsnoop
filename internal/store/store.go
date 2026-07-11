@@ -113,16 +113,19 @@ type capabilities struct {
 
 // session aggregates everything observed for one proxied server instance.
 type session struct {
-	id      string
-	label   string
-	first   time.Time
-	last    time.Time
-	caps    capabilities
+	id    string
+	label string
+	first time.Time
+	last  time.Time
+	caps  capabilities
+
+	advertisedTools []string
+	advertisedSet   map[string]struct{}
+
 	command []string
 	cwd     string
-
-	calls  map[callKey]*call
-	events []*event
+	calls   map[callKey]*call
+	events  []*event
 
 	requests, responses, notifications, errors, pending int
 }
@@ -251,10 +254,11 @@ func (s *Store) sessionFor(e proxy.Envelope) *session {
 	sess, ok := s.sessions[e.SessionID]
 	if !ok {
 		sess = &session{
-			id:    e.SessionID,
-			label: e.ServerLabel,
-			first: e.TS,
-			calls: make(map[callKey]*call),
+			id:            e.SessionID,
+			label:         e.ServerLabel,
+			first:         e.TS,
+			advertisedSet: make(map[string]struct{}),
+			calls:         make(map[callKey]*call),
 		}
 		s.sessions[e.SessionID] = sess
 		s.order = append(s.order, e.SessionID)
@@ -313,8 +317,11 @@ func (sess *session) completeCall(id string, respDir proxy.Direction, ts time.Ti
 		c.state = Completed
 	}
 	sess.pending--
-	if c.method == "initialize" {
+	switch c.method {
+	case "initialize":
 		sess.caps.applyResponse(msg.Result)
+	case "tools/list":
+		sess.applyToolsList(msg.Result)
 	}
 	return c, true
 }
@@ -351,6 +358,30 @@ func (c *capabilities) applyResponse(result json.RawMessage) {
 	}
 	c.server = r.Capabilities
 	c.serverInfo = r.ServerInfo
+}
+
+func (sess *session) applyToolsList(result json.RawMessage) {
+	var r struct {
+		Tools []struct {
+			Name string `json:"name"`
+		} `json:"tools"`
+	}
+
+	if json.Unmarshal(result, &r) != nil {
+		return
+	}
+
+	for _, tool := range r.Tools {
+		if tool.Name == "" {
+			continue
+		}
+		if _, ok := sess.advertisedSet[tool.Name]; ok {
+			continue
+		}
+
+		sess.advertisedSet[tool.Name] = struct{}{}
+		sess.advertisedTools = append(sess.advertisedTools, tool.Name)
+	}
 }
 
 func toolName(params json.RawMessage) string {

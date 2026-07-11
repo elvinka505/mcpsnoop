@@ -172,6 +172,35 @@ func (s *Store) Capabilities(sessionID string) (CapsView, bool) {
 	}, true
 }
 
+// ToolUsage reports which advertised tools were called during the session.
+func (s *Store) ToolUsage(sessionID string) (used, unused []string, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sess, found := s.sessions[sessionID]
+	if !found || len(sess.advertisedTools) == 0 {
+		return nil, nil, false
+	}
+
+	called := make(map[string]bool)
+
+	for _, c := range sess.calls {
+		if c.isTool && c.toolName != "" {
+			called[c.toolName] = true
+		}
+	}
+
+	for _, name := range sess.advertisedTools {
+		if called[name] {
+			used = append(used, name)
+		} else {
+			unused = append(unused, name)
+		}
+	}
+
+	return used, unused, true
+}
+
 // Command returns the wrapped server command for a session (from the meta
 // frame), used to replay against an isolated copy. ok is false if unknown.
 func (s *Store) Command(sessionID string) (command []string, cwd string, ok bool) {

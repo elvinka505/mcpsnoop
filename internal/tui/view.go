@@ -599,15 +599,27 @@ func (m Model) capsContent() string {
 	var b strings.Builder
 	b.WriteString(m.styles.panelTitle.Render(" CAPABILITIES · "+label) + "\n")
 	caps, ok := m.store.Capabilities(sid)
-	if !ok {
-		b.WriteString(m.styles.dim.Render(" no handshake observed yet for this session"))
+	used, unused, hasTools := m.store.ToolUsage(sid)
+
+	if !ok && !hasTools {
+		b.WriteString(m.styles.dim.Render(" handshake not captured"))
 		return b.String()
 	}
-	b.WriteString(" protocolVersion: " + valueOr(caps.ProtocolVersion, "(unknown)") + "\n\n")
-	b.WriteString(m.styles.req.Render(" CLIENT  "+infoLine(caps.ClientInfo)) + "\n")
-	b.WriteString(capsBlock(caps.Client) + "\n\n")
-	b.WriteString(m.styles.resp.Render(" SERVER  "+infoLine(caps.ServerInfo)) + "\n")
-	b.WriteString(capsBlock(caps.Server))
+	if ok {
+		b.WriteString(" protocolVersion: " + valueOr(caps.ProtocolVersion, "(unknown)") + "\n\n")
+		b.WriteString(m.styles.req.Render(" CLIENT  "+infoLine(caps.ClientInfo)) + "\n")
+		b.WriteString(capsBlock(caps.Client) + "\n\n")
+		b.WriteString(m.styles.resp.Render(" SERVER  "+infoLine(caps.ServerInfo)) + "\n")
+		b.WriteString(capsBlock(caps.Server))
+	} else {
+		b.WriteString(m.styles.dim.Render(" handshake not captured"))
+	}
+	if hasTools {
+		b.WriteString("\n\n")
+		b.WriteString(toolList(" USED", used))
+		b.WriteString("\n")
+		b.WriteString(toolList(" UNUSED", unused))
+	}
 	return b.String()
 }
 
@@ -631,6 +643,23 @@ func capsBlock(raw json.RawMessage) string {
 		return "  (none)"
 	}
 	return indentLines(prettyJSON(raw), "  ")
+}
+
+func toolList(title string, tools []string) string {
+	var b strings.Builder
+
+	b.WriteString(title + "\n")
+
+	if len(tools) == 0 {
+		b.WriteString("  (none)\n")
+		return b.String()
+	}
+
+	for _, tool := range tools {
+		b.WriteString("  " + tool + "\n")
+	}
+
+	return b.String()
 }
 
 func indentLines(s, prefix string) string {
