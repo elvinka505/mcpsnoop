@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/kerlenton/mcpsnoop/internal/proxy"
@@ -170,6 +171,44 @@ func (s *Store) Capabilities(sessionID string) (CapsView, bool) {
 		Client:          sess.caps.client,
 		Server:          sess.caps.server,
 	}, true
+}
+
+// ToolUsage reports which advertised tools were called during the session.
+func (s *Store) ToolUsage(sessionID string) (used, unused, unadvertised []string, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sess, found := s.sessions[sessionID]
+	if !found {
+		return nil, nil, nil, false
+	}
+
+	called := make(map[string]bool)
+	for _, c := range sess.calls {
+		if c.isTool && c.toolName != "" {
+			called[c.toolName] = true
+		}
+	}
+
+	for _, name := range sess.advertisedTools {
+		if called[name] {
+			used = append(used, name)
+		} else {
+			unused = append(unused, name)
+		}
+	}
+
+	for name := range called {
+		if _, ok := sess.advertisedSet[name]; !ok {
+			unadvertised = append(unadvertised, name)
+		}
+	}
+	sort.Strings(unadvertised)
+
+	if len(sess.advertisedTools) == 0 && len(unadvertised) == 0 {
+		return nil, nil, nil, false
+	}
+	return used, unused, unadvertised, true
 }
 
 // Command returns the wrapped server command for a session (from the meta

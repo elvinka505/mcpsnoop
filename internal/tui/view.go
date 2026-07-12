@@ -1073,7 +1073,8 @@ func (m Model) capsContent() string {
 		label = m.sessions[m.selSession].Label
 	}
 	caps, ok := m.store.Capabilities(sid)
-	if !ok {
+	used, unused, unadvertised, hasTools := m.store.ToolUsage(sid)
+	if !ok && !hasTools {
 		return m.styles.faint.Render(" no handshake observed yet for this session")
 	}
 	var b strings.Builder
@@ -1083,11 +1084,22 @@ func (m Model) capsContent() string {
 		return " " + m.styles.dim.Render(name+" · ") + m.styles.neutral.Render(valueOr(info, "unknown")) + "\n"
 	}
 	b.WriteString(m.styles.panelTitle.Render(" capabilities · "+label) + "\n\n")
-	b.WriteString(" " + m.styles.dim.Render("protocolVersion ") + m.styles.neutral.Render(valueOr(caps.ProtocolVersion, "unknown")) + "\n\n")
-	b.WriteString(role("client", infoLine(caps.ClientInfo)))
-	b.WriteString(m.capsBlock(caps.Client) + "\n\n")
-	b.WriteString(role("server", infoLine(caps.ServerInfo)))
-	b.WriteString(m.capsBlock(caps.Server))
+	if ok {
+		b.WriteString(" " + m.styles.dim.Render("protocolVersion ") + m.styles.neutral.Render(valueOr(caps.ProtocolVersion, "unknown")) + "\n\n")
+		b.WriteString(role("client", infoLine(caps.ClientInfo)))
+		b.WriteString(m.capsBlock(caps.Client) + "\n\n")
+		b.WriteString(role("server", infoLine(caps.ServerInfo)))
+		b.WriteString(m.capsBlock(caps.Server))
+	} else {
+		b.WriteString(m.styles.faint.Render(" handshake not captured"))
+	}
+	if hasTools {
+		sections := []string{m.toolList("used", used), m.toolList("unused", unused)}
+		if len(unadvertised) > 0 {
+			sections = append(sections, m.toolList("called but not advertised", unadvertised))
+		}
+		b.WriteString("\n\n" + strings.Join(sections, "\n\n"))
+	}
 	return b.String()
 }
 
@@ -1117,6 +1129,19 @@ func (m Model) capsBlock(raw json.RawMessage) string {
 		out = append(out, "   "+m.highlightJSON(ln))
 	}
 	return strings.Join(out, "\n")
+}
+
+// toolList renders one tool-usage group, a dim title over the tool names, or a
+// faint (none) when the group is empty. Names stay neutral, no verdict color.
+func (m Model) toolList(title string, tools []string) string {
+	rows := []string{" " + m.styles.dim.Render(title)}
+	if len(tools) == 0 {
+		rows = append(rows, "   "+m.styles.faint.Render("(none)"))
+	}
+	for _, t := range tools {
+		rows = append(rows, "   "+m.styles.neutral.Render(t))
+	}
+	return strings.Join(rows, "\n")
 }
 
 func valueOr(s, fallback string) string {
