@@ -599,12 +599,14 @@ func (m Model) capsContent() string {
 	var b strings.Builder
 	b.WriteString(m.styles.panelTitle.Render(" CAPABILITIES · "+label) + "\n")
 	caps, ok := m.store.Capabilities(sid)
-	used, unused, hasTools := m.store.ToolUsage(sid)
+	used, unused, unadvertised, hasTools := m.store.ToolUsage(sid)
+	noCaps := m.styles.dim.Render(" handshake not captured")
 
 	if !ok && !hasTools {
-		b.WriteString(m.styles.dim.Render(" handshake not captured"))
+		b.WriteString(noCaps)
 		return b.String()
 	}
+
 	if ok {
 		b.WriteString(" protocolVersion: " + valueOr(caps.ProtocolVersion, "(unknown)") + "\n\n")
 		b.WriteString(m.styles.req.Render(" CLIENT  "+infoLine(caps.ClientInfo)) + "\n")
@@ -612,13 +614,16 @@ func (m Model) capsContent() string {
 		b.WriteString(m.styles.resp.Render(" SERVER  "+infoLine(caps.ServerInfo)) + "\n")
 		b.WriteString(capsBlock(caps.Server))
 	} else {
-		b.WriteString(m.styles.dim.Render(" handshake not captured"))
+		b.WriteString(noCaps)
 	}
+
 	if hasTools {
 		b.WriteString("\n\n")
 		b.WriteString(toolList(" USED", used))
 		b.WriteString("\n")
 		b.WriteString(toolList(" UNUSED", unused))
+		b.WriteString("\n")
+		b.WriteString(toolList(" CALLED BUT NOT ADVERTISED", unadvertised))
 	}
 	return b.String()
 }

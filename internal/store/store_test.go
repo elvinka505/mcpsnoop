@@ -304,7 +304,7 @@ func TestToolUsageDistinguishesUsedFromUnused(t *testing.T) {
 	s.Ingest(req(5, t0, proxy.ClientToServer, "3", "tools/call", `{"name":"search"}`))
 	s.Ingest(resp(6, t0, proxy.ServerToClient, "3", `"result":{}`))
 
-	used, unused, ok := s.ToolUsage("s1")
+	used, unused, unadvertised, ok := s.ToolUsage("s1")
 	if !ok {
 		t.Fatal("expected tool usage")
 	}
@@ -316,6 +316,9 @@ func TestToolUsageDistinguishesUsedFromUnused(t *testing.T) {
 	}
 	if len(unused) != 1 || unused[0] != "sum" {
 		t.Fatalf("unused = %v, want [sum]", unused)
+	}
+	if len(unadvertised) != 0 {
+		t.Fatalf("unadvertised = %v, want none", unadvertised)
 	}
 }
 
@@ -331,7 +334,7 @@ func TestToolUsageUnionsMultipleToolsListResponses(t *testing.T) {
 	s.Ingest(resp(4, t0, proxy.ServerToClient, "2",
 		`"result":{"tools":[{"name":"echo"},{"name":"sum"}]}`))
 
-	_, unused, ok := s.ToolUsage("s1")
+	_, unused, unadvertised, ok := s.ToolUsage("s1")
 	if !ok {
 		t.Fatal("expected tool usage")
 	}
@@ -340,5 +343,37 @@ func TestToolUsageUnionsMultipleToolsListResponses(t *testing.T) {
 	}
 	if unused[0] != "echo" || unused[1] != "sum" {
 		t.Fatalf("unused = %v, want [echo sum]", unused)
+	}
+	if len(unadvertised) != 0 {
+		t.Fatalf("unadvertised = %v, want none", unadvertised)
+	}
+}
+
+func TestToolUsageReportsCalledButNotAdvertised(t *testing.T) {
+	s := New(0)
+	t0 := time.Now()
+	s.Ingest(req(1, t0, proxy.ClientToServer, "1", "tools/list", ""))
+	s.Ingest(resp(2, t0, proxy.ServerToClient, "1",
+		`"result":{"tools":[{"name":"echo"}]}`))
+	s.Ingest(req(3, t0, proxy.ClientToServer, "2", "tools/call", `{"name":"search"}`))
+	s.Ingest(resp(4, t0, proxy.ServerToClient, "2", `"result":{}`))
+
+	s.Ingest(req(5, t0, proxy.ClientToServer, "3", "tools/call", `{"name":"weather"}`))
+	s.Ingest(resp(6, t0, proxy.ServerToClient, "3", `"result":{}`))
+
+	used, unused, unadvertised, ok := s.ToolUsage("s1")
+	if !ok {
+		t.Fatal("expected tool usage")
+	}
+	if len(used) != 0 {
+		t.Fatalf("used = %v, want none", used)
+	}
+	if len(unused) != 1 || unused[0] != "echo" {
+		t.Fatalf("unused = %v, want [echo]", unused)
+	}
+	if len(unadvertised) != 2 ||
+		unadvertised[0] != "search" ||
+		unadvertised[1] != "weather" {
+		t.Fatalf("unadvertised = %v, want [search weather]", unadvertised)
 	}
 }
