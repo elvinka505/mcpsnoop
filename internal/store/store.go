@@ -85,20 +85,21 @@ type call struct {
 
 // event is the mutable internal timeline entry.
 type event struct {
-	seq       uint64
-	ts        time.Time
-	dir       proxy.Direction
-	kind      EventKind
-	method    string
-	id        string
-	raw       json.RawMessage
-	text      string
-	warning   string
-	mcpMethod string // Mcp-Method routing header (HTTP transport, SEP-2243)
-	mcpName   string // Mcp-Name routing header
-	batch     bool   // one element of a JSON-RPC batch (routing headers cannot address it)
-	mismatch  bool   // a routing header disagrees with the body (structured flag for warning)
-	call      *call  // set for request/response events
+	seq                uint64
+	ts                 time.Time
+	dir                proxy.Direction
+	kind               EventKind
+	method             string
+	id                 string
+	raw                json.RawMessage
+	text               string
+	warning            string
+	mcpMethod          string // Mcp-Method routing header (HTTP transport, SEP-2243)
+	mcpName            string // Mcp-Name routing header
+	mcpProtocolVersion string // MCP-Protocol-Version request header
+	batch              bool   // one element of a JSON-RPC batch (routing headers cannot address it)
+	mismatch           bool   // a routing header disagrees with the body (structured flag for warning)
+	call               *call  // set for request/response events
 }
 
 // capabilities holds what each side declared, whether through the legacy
@@ -182,7 +183,7 @@ func (s *Store) Ingest(e proxy.Envelope) EventView {
 		return EventView{Kind: EventOther} // control frame, not shown in the stream
 	}
 
-	ev := &event{seq: e.Seq, ts: e.TS, dir: e.Direction, raw: e.Raw, text: e.Text, mcpMethod: e.MCPMethod, mcpName: e.MCPName, batch: e.Batch}
+	ev := &event{seq: e.Seq, ts: e.TS, dir: e.Direction, raw: e.Raw, text: e.Text, mcpMethod: e.MCPMethod, mcpName: e.MCPName, mcpProtocolVersion: e.MCPProtocolVersion, batch: e.Batch}
 
 	if e.Direction == proxy.ServerStderr {
 		ev.kind = EventStderr
@@ -272,6 +273,20 @@ func (s *Store) Ingest(e proxy.Envelope) EventView {
 				ev.warning = appendWarning(ev.warning, "routing header Mcp-Name "+ev.mcpName+" disagrees with body name "+name)
 				ev.mismatch = true
 			}
+		}
+	}
+
+	// The MCP-Protocol-Version header must match the version the request repeats in
+	// its _meta; a gateway routes on the header while the server reads the body, so
+	// a disagreement is the same class of spec violation as a routing-header
+	// mismatch. This is request-scoped, so unlike the routing headers it is valid on
+	// a batch and gated only on the header being present.
+	if ev.mcpProtocolVersion != "" {
+		if mv := metaProtocolVersion(msg.Params); mv != "" && mv != ev.mcpProtocolVersion {
+			ev.warning = appendWarning(ev.warning,
+				"MCP-Protocol-Version header "+ev.mcpProtocolVersion+
+					" disagrees with _meta protocolVersion "+mv)
+			ev.mismatch = true
 		}
 	}
 
@@ -579,6 +594,24 @@ func operationName(msg proxy.RPCMessage) string {
 	default:
 		return ""
 	}
+}
+
+// metaProtocolVersion returns the protocol version a request repeats in its
+// _meta (io.modelcontextprotocol/protocolVersion), or "" when absent, so the
+// MCP-Protocol-Version header can be checked against it.
+func metaProtocolVersion(params json.RawMessage) string {
+	if len(params) == 0 {
+		return ""
+	}
+	var p struct {
+		Meta struct {
+			ProtocolVersion string `json:"io.modelcontextprotocol/protocolVersion"`
+		} `json:"_meta"`
+	}
+	if json.Unmarshal(params, &p) != nil {
+		return ""
+	}
+	return p.Meta.ProtocolVersion
 }
 
 func validationWarning(msg proxy.RPCMessage) string {
