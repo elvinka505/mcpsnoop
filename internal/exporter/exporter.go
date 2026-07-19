@@ -25,6 +25,7 @@ const (
 	FormatHTML Format = "html"
 	FormatText Format = "text"
 	FormatOTLP Format = "otlp"
+	FormatHAR  Format = "har"
 )
 
 type Options struct {
@@ -126,10 +127,12 @@ func ParseFormat(s string) (Format, error) {
 		return FormatHTML, nil
 	case FormatText:
 		return FormatText, nil
+	case FormatHAR:
+		return FormatHAR, nil
 	case FormatOTLP:
 		return FormatOTLP, nil
 	default:
-		return "", fmt.Errorf("unknown export format %q (want json, html, text, or otlp)", s)
+		return "", fmt.Errorf("unknown export format %q (want json, html, text, har, or otlp)", s)
 	}
 }
 
@@ -312,6 +315,8 @@ func Write(w io.Writer, data SessionExport, opts Options) error {
 		return writeHTML(w, data)
 	case FormatText:
 		return writeText(w, data)
+	case FormatHAR:
+		return WriteHAR(w, data)
 	case FormatOTLP:
 		return WriteOTLP(w, data)
 	default:
